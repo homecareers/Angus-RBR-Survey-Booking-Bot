@@ -54,13 +54,13 @@ def submit():
         legacy_code = generate_legacy_code()
         
         # Map the new survey questions to Airtable fields
-        # The new survey has these 6 questions:
-        # 1. Future motivation (time freedom, income, career change, community, other)
-        # 2. Time commitment (3-5, 5-10, 10-15, 15+ hours)
-        # 3. Experience level (newbie, tried before unsuccessful, tried before successful)
-        # 4. Readiness to start (right now, 30 days, 2-3 months, just exploring)
-        # 5. Confidence level (1-10 scale)
-        # 6. Team role preference (Pearl, Ruby, Sapphire, Emerald)
+        # The new survey has these 6 questions mapped to original field names:
+        # 1. Future motivation → Q1 Reason for Business  
+        # 2. Time commitment → Q2 Time Commitment
+        # 3. Experience level → Q3 Business Experience
+        # 4. Readiness to start → Q4 Startup Readiness
+        # 5. Confidence level → Q5 Confidence Level
+        # 6. Team role preference → Q6 Business Style (GEM)
         
         # Ensure we have at least 6 answers
         while len(answers) < 6:
@@ -74,12 +74,12 @@ def submit():
             "fields": {
                 "Legacy Code": legacy_code,
                 "Date Submitted": datetime.date.today().isoformat(),
-                "Q1 Future Motivation": answers[0][:100000] if len(answers[0]) > 100000 else answers[0],
+                "Q1 Reason for Business": answers[0][:100000] if len(answers[0]) > 100000 else answers[0],
                 "Q2 Time Commitment": answers[1][:100000] if len(answers[1]) > 100000 else answers[1],
-                "Q3 Experience Level": answers[2][:100000] if len(answers[2]) > 100000 else answers[2],
-                "Q4 Readiness to Start": answers[3][:100000] if len(answers[3]) > 100000 else answers[3],
+                "Q3 Business Experience": answers[2][:100000] if len(answers[2]) > 100000 else answers[2],
+                "Q4 Startup Readiness": answers[3][:100000] if len(answers[3]) > 100000 else answers[3],
                 "Q5 Confidence Level": answers[4][:100000] if len(answers[4]) > 100000 else answers[4],
-                "Q6 Team Role Preference": answers[5][:100000] if len(answers[5]) > 100000 else answers[5]
+                "Q6 Business Style (GEM)": answers[5][:100000] if len(answers[5]) > 100000 else answers[5]
             }
         }
         
@@ -90,14 +90,12 @@ def submit():
         else:
             print("Successfully posted to responses table")
         
-        # Insert into Legacy Code HQ
+        # Insert into Legacy Code HQ (without Legacy Code field since it's computed)
         hq_url = f"https://api.airtable.com/v0/{BASE_ID}/{HQ_TABLE}"
         payload_hq = {
             "fields": {
-                "Legacy Code": legacy_code,
                 "Prospect Email": email,
-                "Prospect Phone": phone,
-                "Date Created": datetime.date.today().isoformat()
+                "Prospect Phone": phone
             }
         }
         
