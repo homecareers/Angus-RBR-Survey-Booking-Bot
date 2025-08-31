@@ -48,39 +48,47 @@ def submit():
         phone = data["phone"]
         answers = data["answers"]
         
+        print(f"Received survey data: Email={email}, Phone={phone}, Answers={len(answers)} responses")
+        
         # Generate Legacy Code
         legacy_code = generate_legacy_code()
+        
+        # Map the new survey questions to Airtable fields
+        # The new survey has these 6 questions:
+        # 1. Future motivation (time freedom, income, career change, community, other)
+        # 2. Time commitment (3-5, 5-10, 10-15, 15+ hours)
+        # 3. Experience level (newbie, tried before unsuccessful, tried before successful)
+        # 4. Readiness to start (right now, 30 days, 2-3 months, just exploring)
+        # 5. Confidence level (1-10 scale)
+        # 6. Team role preference (Pearl, Ruby, Sapphire, Emerald)
+        
+        # Ensure we have at least 6 answers
+        while len(answers) < 6:
+            answers.append("No response provided")
         
         # Insert into Legacy Builder Responses
         responses_url = f"https://api.airtable.com/v0/{BASE_ID}/{RESPONSES_TABLE}"
         headers = {"Authorization": f"Bearer {AIRTABLE_API_KEY}", "Content-Type": "application/json"}
         
-        # Ensure answers are strings and handle long text properly
-        processed_answers = []
-        for answer in answers:
-            if isinstance(answer, str):
-                # Trim to Airtable's long text limit if needed (100,000 chars)
-                processed_answers.append(answer[:100000] if len(answer) > 100000 else answer)
-            else:
-                processed_answers.append(str(answer))
-        
         payload_responses = {
             "fields": {
                 "Legacy Code": legacy_code,
                 "Date Submitted": datetime.date.today().isoformat(),
-                "Q1 Reason for Business": processed_answers[0],
-                "Q2 Time Commitment": processed_answers[1],
-                "Q3 Business Experience": processed_answers[2],
-                "Q4 Startup Readiness": processed_answers[3],
-                "Q5 Confidence Level": processed_answers[4],
-                "Q6 Business Style (GEM)": processed_answers[5]
+                "Q1 Future Motivation": answers[0][:100000] if len(answers[0]) > 100000 else answers[0],
+                "Q2 Time Commitment": answers[1][:100000] if len(answers[1]) > 100000 else answers[1],
+                "Q3 Experience Level": answers[2][:100000] if len(answers[2]) > 100000 else answers[2],
+                "Q4 Readiness to Start": answers[3][:100000] if len(answers[3]) > 100000 else answers[3],
+                "Q5 Confidence Level": answers[4][:100000] if len(answers[4]) > 100000 else answers[4],
+                "Q6 Team Role Preference": answers[5][:100000] if len(answers[5]) > 100000 else answers[5]
             }
         }
         
         # Post to responses table
         response1 = requests.post(responses_url, headers=headers, json=payload_responses)
         if response1.status_code != 200:
-            print(f"Error posting to responses table: {response1.text}")
+            print(f"Error posting to responses table: {response1.status_code} - {response1.text}")
+        else:
+            print("Successfully posted to responses table")
         
         # Insert into Legacy Code HQ
         hq_url = f"https://api.airtable.com/v0/{BASE_ID}/{HQ_TABLE}"
@@ -88,20 +96,31 @@ def submit():
             "fields": {
                 "Legacy Code": legacy_code,
                 "Prospect Email": email,
-                "Prospect Phone": phone
+                "Prospect Phone": phone,
+                "Date Created": datetime.date.today().isoformat()
             }
         }
         
         # Post to HQ table
         response2 = requests.post(hq_url, headers=headers, json=payload_hq)
         if response2.status_code != 200:
-            print(f"Error posting to HQ table: {response2.text}")
+            print(f"Error posting to HQ table: {response2.status_code} - {response2.text}")
+        else:
+            print("Successfully posted to HQ table")
         
-        return jsonify({"legacy_code": legacy_code, "status": "success"})
+        print(f"Survey completed successfully. Legacy Code: {legacy_code}")
+        return jsonify({
+            "legacy_code": legacy_code, 
+            "status": "success",
+            "message": "Survey submitted successfully!"
+        })
     
     except Exception as e:
         print(f"Error in submit route: {e}")
-        return jsonify({"error": "An error occurred processing your request"}), 500
+        return jsonify({
+            "error": "An error occurred processing your request",
+            "status": "error"
+        }), 500
 
 # Health check endpoint
 @app.route("/health")
@@ -116,7 +135,33 @@ def health():
             "message": "Missing required environment variables"
         }), 500
     
-    return jsonify({"status": "healthy"})
+    return jsonify({
+        "status": "healthy",
+        "base_id": AIRTABLE_BASE_ID,
+        "tables": {
+            "responses": RESPONSES_TABLE,
+            "hq": HQ_TABLE
+        }
+    })
+
+# Test endpoint to verify Airtable connection
+@app.route("/test-airtable")
+def test_airtable():
+    try:
+        url = f"https://api.airtable.com/v0/{BASE_ID}/{HQ_TABLE}?maxRecords=1"
+        headers = {"Authorization": f"Bearer {AIRTABLE_API_KEY}"}
+        response = requests.get(url, headers=headers)
+        
+        return jsonify({
+            "status": "success" if response.status_code == 200 else "error",
+            "status_code": response.status_code,
+            "response": response.json() if response.status_code == 200 else response.text
+        })
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "error": str(e)
+        })
 
 if __name__ == "__main__":
     # Check for required environment variables on startup
@@ -128,4 +173,6 @@ if __name__ == "__main__":
         exit(1)
         
     print(f"Starting Flask app with Base ID: {AIRTABLE_BASE_ID}")
+    print(f"Responses Table: {RESPONSES_TABLE}")
+    print(f"HQ Table: {HQ_TABLE}")
     app.run(debug=True, host='0.0.0.0', port=5000)
