@@ -4,10 +4,10 @@ import requests, datetime
 app = Flask(__name__)
 
 # Airtable credentials
-AIRTABLE_API_KEY = "YOUR_API_KEY"
-BASE_ID = "YOUR_BASE_ID"
-RESPONSES_TABLE = "Legacy Builder Responses"
-HQ_TABLE = "Legacy Code HQ"
+"AIRTABLE_API_KEY": bool(os.getenv('AIRTABLE_API_KEY')),
+    "AIRTABLE_BASE_ID": bool(os.getenv('AIRTABLE_BASE_ID')),
+    "AIRTABLE_TABLE_NAME": bool(os.getenv('AIRTABLE_TABLE_NAME')),
+    "AIRTABLE_PROSPECTS_TABLE": bool(os.getenv('AIRTABLE_PROSPECTS_TABLE')),
 
 # Function to generate Legacy Code
 def generate_legacy_code():
