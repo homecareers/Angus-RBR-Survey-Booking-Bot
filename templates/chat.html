@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>ANGUS™ Survey Bot</title>
+  <style>
+    body { font-family: Arial; background: #111; color: #eee; }
+    .chat-box { width: 400px; margin: 50px auto; background: #222; padding: 20px; border-radius: 8px; }
+    .message { margin: 10px 0; }
+    .bot { color: #0ff; }
+    .user { color: #0f0; text-align: right; }
+    input { width: 100%; padding: 8px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <div class="chat-box" id="chat"></div>
+  <input id="userInput" placeholder="Type here and press Enter" />
+  <script>
+    const questions = [
+      "When you picture your future, which one gets you fired up the most?",
+      "If building your future was a Netflix series, how many hours a week would you binge it?",
+      "Every hero’s got a storyline — which best describes yours so far?",
+      "If I dropped a simple game plan in your lap today, when would you press play?",
+      "On a 1–10 confidence scale, where are you right now?",
+      "In a team setting, what lights you up the most?",
+      "Drop your best email:",
+      "And your phone number:"
+    ];
+    let answers = [];
+    let step = 0;
+
+    function showBotMessage(msg) {
+      document.getElementById("chat").innerHTML += `<div class='message bot'>${msg}</div>`;
+    }
+    function showUserMessage(msg) {
+      document.getElementById("chat").innerHTML += `<div class='message user'>${msg}</div>`;
+    }
+
+    function askNext() {
+      if (step < questions.length) {
+        showBotMessage(questions[step]);
+      } else {
+        submitSurvey();
+      }
+    }
+
+    function submitSurvey() {
+      fetch("/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: answers[6],
+          phone: answers[7],
+          answers: answers.slice(0,6)
+        })
+      }).then(res => res.json()).then(data => {
+        showBotMessage(`Boom! Your official Legacy Code™ is: <b>${data.legacy_code}</b> 🎯`);
+        showBotMessage(`<a href='BOOKING_PAGE_URL'>Book your Strategy Call</a>`);
+      });
+    }
+
+    document.getElementById("userInput").addEventListener("keydown", e => {
+      if (e.key === "Enter") {
+        const input = e.target.value;
+        if (!input) return;
+        showUserMessage(input);
+        answers.push(input);
+        e.target.value = "";
+        step++;
+        askNext();
+      }
+    });
+
+    window.onload = () => { 
+      showBotMessage("What’s up, legend?! I’m ANGUS™ — the strategist behind the curtain of The Real Brick Road™. My job? To hand you the playbook that works every single time. All I need is a few gut-punch honest answers. Don’t overthink it — just fire back with your truth. Ready? (Press Enter to start)");
+      askNext();
+    }
+  </script>
+</body>
+</html>
