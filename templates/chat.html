@@ -1,79 +1,463 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>ANGUS™ Survey Bot</title>
-  <style>
-    body { font-family: Arial; background: #111; color: #eee; }
-    .chat-box { width: 400px; margin: 50px auto; background: #222; padding: 20px; border-radius: 8px; }
-    .message { margin: 10px 0; }
-    .bot { color: #0ff; }
-    .user { color: #0f0; text-align: right; }
-    input { width: 100%; padding: 8px; margin-top: 10px; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Real Brick Road™ Survey</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+            color: #ffffff;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            max-width: 900px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            scroll-behavior: smooth;
+        }
+
+        .message {
+            margin-bottom: 20px;
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        .message.bot {
+            text-align: left;
+        }
+
+        .message.user {
+            text-align: right;
+        }
+
+        .message-content {
+            display: inline-block;
+            max-width: 80%;
+            padding: 15px 20px;
+            border-radius: 20px;
+            line-height: 1.6;
+            font-size: 16px;
+        }
+
+        .message.bot .message-content {
+            background: rgba(0, 200, 255, 0.1);
+            border: 1px solid rgba(0, 200, 255, 0.3);
+            color: #00c8ff;
+        }
+
+        .message.user .message-content {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: #ffffff;
+        }
+
+        .input-container {
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .input-wrapper {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        #user-input {
+            flex: 1;
+            padding: 15px 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 25px;
+            background: rgba(255, 255, 255, 0.05);
+            color: #ffffff;
+            font-size: 16px;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        #user-input:focus {
+            border-color: #00c8ff;
+            box-shadow: 0 0 20px rgba(0, 200, 255, 0.2);
+        }
+
+        #user-input::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        #send-btn {
+            padding: 15px 25px;
+            background: linear-gradient(45deg, #00c8ff, #0099cc);
+            border: none;
+            border-radius: 25px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 16px;
+        }
+
+        #send-btn:hover {
+            background: linear-gradient(45deg, #0099cc, #007399);
+            transform: translateY(-1px);
+            box-shadow: 0 5px 15px rgba(0, 200, 255, 0.3);
+        }
+
+        #send-btn:disabled {
+            background: rgba(255, 255, 255, 0.1);
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .typing-indicator {
+            display: none;
+            text-align: left;
+            margin-bottom: 20px;
+        }
+
+        .typing-indicator .message-content {
+            background: rgba(0, 200, 255, 0.1);
+            border: 1px solid rgba(0, 200, 255, 0.3);
+            color: #00c8ff;
+        }
+
+        .typing-dots {
+            display: inline-block;
+        }
+
+        .typing-dots::after {
+            content: '';
+            animation: typing 1.5s infinite;
+        }
+
+        @keyframes typing {
+            0%, 20% { content: ''; }
+            40% { content: '.'; }
+            60% { content: '..'; }
+            80%, 100% { content: '...'; }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .completion-message {
+            text-align: center;
+            padding: 30px;
+            background: linear-gradient(45deg, rgba(0, 200, 255, 0.1), rgba(0, 153, 204, 0.1));
+            border-radius: 15px;
+            margin: 20px;
+            border: 1px solid rgba(0, 200, 255, 0.3);
+        }
+
+        .legacy-code {
+            font-size: 24px;
+            font-weight: bold;
+            color: #00c8ff;
+            margin: 15px 0;
+            letter-spacing: 2px;
+        }
+
+        @media (max-width: 768px) {
+            .message-content {
+                max-width: 90%;
+                font-size: 14px;
+                padding: 12px 16px;
+            }
+            
+            .input-container {
+                padding: 15px;
+            }
+            
+            #user-input, #send-btn {
+                font-size: 14px;
+                padding: 12px 16px;
+            }
+        }
+    </style>
 </head>
 <body>
-  <div class="chat-box" id="chat"></div>
-  <input id="userInput" placeholder="Type here and press Enter" />
-  <script>
-    const questions = [
-      "When you picture your future, which one gets you fired up the most?",
-      "If building your future was a Netflix series, how many hours a week would you binge it?",
-      "Every hero’s got a storyline — which best describes yours so far?",
-      "If I dropped a simple game plan in your lap today, when would you press play?",
-      "On a 1–10 confidence scale, where are you right now?",
-      "In a team setting, what lights you up the most?",
-      "Drop your best email:",
-      "And your phone number:"
-    ];
-    let answers = [];
-    let step = 0;
+    <div class="chat-container">
+        <div class="chat-messages" id="chat-messages">
+            <div class="message bot">
+                <div class="message-content">
+                    What's up, legend?! I'm ANGUS™ — the strategist behind the curtain of The Real Brick Road™. My job? To hand you the playbook that works every single time. All I need is a few gut-punch honest answers. Don't overthink it — just fire back with your truth. Ready?<br><br>
+                    <strong>(Press Enter to start)</strong>
+                </div>
+            </div>
+        </div>
+        
+        <div class="typing-indicator" id="typing-indicator">
+            <div class="message-content">
+                <span class="typing-dots">ANGUS is typing</span>
+            </div>
+        </div>
 
-    function showBotMessage(msg) {
-      document.getElementById("chat").innerHTML += `<div class='message bot'>${msg}</div>`;
-    }
-    function showUserMessage(msg) {
-      document.getElementById("chat").innerHTML += `<div class='message user'>${msg}</div>`;
-    }
+        <div class="input-container">
+            <div class="input-wrapper">
+                <input type="text" id="user-input" placeholder="Type here and press Enter" autofocus>
+                <button id="send-btn" onclick="handleSubmit()">Send</button>
+            </div>
+        </div>
+    </div>
 
-    function askNext() {
-      if (step < questions.length) {
-        showBotMessage(questions[step]);
-      } else {
-        submitSurvey();
-      }
-    }
+    <script>
+        // Survey state
+        let currentStep = 0;
+        let surveyStarted = false;
+        let answers = [];
+        let userEmail = '';
+        let userPhone = '';
 
-    function submitSurvey() {
-      fetch("/submit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: answers[6],
-          phone: answers[7],
-          answers: answers.slice(0,6)
-        })
-      }).then(res => res.json()).then(data => {
-        showBotMessage(`Boom! Your official Legacy Code™ is: <b>${data.legacy_code}</b> 🎯`);
-        showBotMessage(`<a href='BOOKING_PAGE_URL'>Book your Strategy Call</a>`);
-      });
-    }
+        // Survey questions
+        const questions = [
+            {
+                question: "When you picture your future, which one gets you fired up the most?",
+                placeholder: "Tell me what drives you..."
+            },
+            {
+                question: "How much time can you realistically commit to building this dream? Be brutally honest.",
+                placeholder: "Hours per day/week..."
+            },
+            {
+                question: "What's your business experience level? No judgment here - just need to know where you're starting from.",
+                placeholder: "Describe your experience..."
+            },
+            {
+                question: "On a scale of 1-10, how ready are you to actually START (not just dream about it)?",
+                placeholder: "Give me a number and why..."
+            },
+            {
+                question: "What's your confidence level in making this work? Again, gut-punch honesty.",
+                placeholder: "Be completely honest..."
+            },
+            {
+                question: "Are you more of a Go-getter, an Executor, or a Master planner? (Pick one and tell me why)",
+                placeholder: "Choose one: Go-getter, Executor, or Master planner and explain..."
+            }
+        ];
 
-    document.getElementById("userInput").addEventListener("keydown", e => {
-      if (e.key === "Enter") {
-        const input = e.target.value;
-        if (!input) return;
-        showUserMessage(input);
-        answers.push(input);
-        e.target.value = "";
-        step++;
-        askNext();
-      }
-    });
+        // DOM elements
+        const chatMessages = document.getElementById('chat-messages');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+        const typingIndicator = document.getElementById('typing-indicator');
 
-    window.onload = () => { 
-      showBotMessage("What’s up, legend?! I’m ANGUS™ — the strategist behind the curtain of The Real Brick Road™. My job? To hand you the playbook that works every single time. All I need is a few gut-punch honest answers. Don’t overthink it — just fire back with your truth. Ready? (Press Enter to start)");
-      askNext();
-    }
-  </script>
+        // Event listeners
+        userInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                handleSubmit();
+            }
+        });
+
+        function handleSubmit() {
+            const input = userInput.value.trim();
+            if (!input) return;
+
+            // Add user message
+            addMessage(input, 'user');
+            userInput.value = '';
+
+            if (!surveyStarted) {
+                startSurvey();
+                return;
+            }
+
+            if (currentStep < questions.length) {
+                // Store answer
+                answers.push(input);
+                currentStep++;
+                
+                if (currentStep < questions.length) {
+                    // Ask next question
+                    setTimeout(() => {
+                        askQuestion(currentStep);
+                    }, 1000);
+                } else {
+                    // Ask for email
+                    setTimeout(() => {
+                        askForEmail();
+                    }, 1000);
+                }
+            } else if (!userEmail) {
+                if (isValidEmail(input)) {
+                    userEmail = input;
+                    setTimeout(() => {
+                        askForPhone();
+                    }, 1000);
+                } else {
+                    setTimeout(() => {
+                        addMessage("That doesn't look like a valid email. Try again:", 'bot');
+                        updateInputPlaceholder("Enter your email address");
+                    }, 1000);
+                }
+            } else if (!userPhone) {
+                userPhone = input;
+                setTimeout(() => {
+                    submitSurvey();
+                }, 1000);
+            }
+        }
+
+        function startSurvey() {
+            surveyStarted = true;
+            setTimeout(() => {
+                addMessage("Perfect! Let's dive in. I've got 6 quick questions that'll help me build your personalized roadmap.", 'bot');
+                setTimeout(() => {
+                    askQuestion(0);
+                }, 1500);
+            }, 1000);
+        }
+
+        function askQuestion(questionIndex) {
+            showTyping();
+            setTimeout(() => {
+                hideTyping();
+                addMessage(`**Question ${questionIndex + 1} of 6:**\n\n${questions[questionIndex].question}`, 'bot');
+                updateInputPlaceholder(questions[questionIndex].placeholder);
+            }, 1500);
+        }
+
+        function askForEmail() {
+            showTyping();
+            setTimeout(() => {
+                hideTyping();
+                addMessage("Awesome! Last two things - I need your email to send you the personalized roadmap:", 'bot');
+                updateInputPlaceholder("Enter your email address");
+            }, 1500);
+        }
+
+        function askForPhone() {
+            showTyping();
+            setTimeout(() => {
+                hideTyping();
+                addMessage("And your phone number (in case I need to reach you about your roadmap):", 'bot');
+                updateInputPlaceholder("Enter your phone number");
+            }, 1500);
+        }
+
+        function submitSurvey() {
+            showTyping();
+            
+            // Prepare data
+            const surveyData = {
+                email: userEmail,
+                phone: userPhone,
+                answers: answers
+            };
+
+            // Submit to backend
+            fetch('/submit', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(surveyData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideTyping();
+                if (data.legacy_code) {
+                    showCompletion(data.legacy_code);
+                } else {
+                    addMessage("There was an error processing your survey. Please try again.", 'bot');
+                }
+            })
+            .catch(error => {
+                hideTyping();
+                console.error('Error:', error);
+                addMessage("There was an error submitting your survey. Please try again.", 'bot');
+            });
+        }
+
+        function showCompletion(legacyCode) {
+            const completionHTML = `
+                <div class="completion-message">
+                    <h2>🎉 Survey Complete!</h2>
+                    <div class="legacy-code">${legacyCode}</div>
+                    <p>Your personalized Real Brick Road™ roadmap is being prepared! You'll receive it via email shortly.</p>
+                    <p style="margin-top: 15px; font-size: 14px; opacity: 0.8;">Keep this code handy - you'll need it to access your materials.</p>
+                </div>
+            `;
+            
+            chatMessages.innerHTML += completionHTML;
+            scrollToBottom();
+            
+            // Disable input
+            userInput.disabled = true;
+            sendBtn.disabled = true;
+            userInput.placeholder = "Survey completed - check your email!";
+        }
+
+        function addMessage(text, sender) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}`;
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            
+            // Handle markdown-style bold text
+            const formattedText = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            contentDiv.innerHTML = formattedText.replace(/\n/g, '<br>');
+            
+            messageDiv.appendChild(contentDiv);
+            chatMessages.appendChild(messageDiv);
+            scrollToBottom();
+        }
+
+        function showTyping() {
+            typingIndicator.style.display = 'block';
+            scrollToBottom();
+        }
+
+        function hideTyping() {
+            typingIndicator.style.display = 'none';
+        }
+
+        function updateInputPlaceholder(placeholder) {
+            userInput.placeholder = placeholder;
+        }
+
+        function scrollToBottom() {
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function isValidEmail(email) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            return emailRegex.test(email);
+        }
+
+        // Initialize
+        window.addEventListener('load', function() {
+            userInput.focus();
+        });
+    </script>
 </body>
 </html>
