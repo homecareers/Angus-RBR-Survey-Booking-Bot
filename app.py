@@ -1,9 +1,11 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, request, jsonify
+from flask_cors import CORS
 import requests
 import datetime
 import os
 
 app = Flask(__name__)
+CORS(app)
 
 # Airtable credentials - properly get environment variables
 AIRTABLE_API_KEY = os.getenv('AIRTABLE_API_KEY')
