@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, render_template, request, jsonify
 import requests
 import datetime
 import os
@@ -16,43 +16,29 @@ BASE_ID = AIRTABLE_BASE_ID
 HQ_TABLE = AIRTABLE_PROSPECTS_TABLE or "Legacy Code HQ"
 RESPONSES_TABLE = AIRTABLE_TABLE_NAME or "Legacy Builder Responses"
 
-# Function to generate Legacy Code with better sequence handling
+# Function to generate Legacy Code
 def generate_legacy_code():
+    url = f"https://api.airtable.com/v0/{BASE_ID}/{HQ_TABLE}?maxRecords=1&sort[0][field]=AutoNum&sort[0][direction]=desc"
+    headers = {"Authorization": f"Bearer {AIRTABLE_API_KEY}"}
+    
     try:
-        # Use timestamp-based approach for more reliability
-        timestamp = int(datetime.datetime.now().timestamp())
-        # Get last 4 digits and ensure it's above 1110
-        base_num = timestamp % 10000
-        if base_num < 1110:
-            base_num += 1110
-        
-        new_code = f"Legacy-X25-OP{base_num}"
-        
-        # Double-check this code doesn't already exist
-        url = f"https://api.airtable.com/v0/{BASE_ID}/{RESPONSES_TABLE}?filterByFormula={{Legacy Code}}='{new_code}'"
-        headers = {"Authorization": f"Bearer {AIRTABLE_API_KEY}"}
         response = requests.get(url, headers=headers).json()
-        
-        # If code exists, add a small random number
         if response.get("records"):
-            import random
-            base_num += random.randint(1, 99)
-            new_code = f"Legacy-X25-OP{base_num}"
-        
-        print(f"Generated Legacy Code: {new_code}")
+            last_code = response["records"][0]["fields"].get("Legacy Code", "Legacy-X25-OP1110")
+            last_num = int(last_code.split("OP")[-1])
+        else:
+            last_num = 1110  # starting number
+        new_code = f"Legacy-X25-OP{last_num + 1}"
         return new_code
-        
     except Exception as e:
         print(f"Error generating legacy code: {e}")
-        # Fallback with timestamp
+        # Return a fallback code with timestamp
         timestamp = int(datetime.datetime.now().timestamp())
-        fallback_code = f"Legacy-X25-OP{timestamp % 10000 + 1110}"
-        print(f"Using fallback Legacy Code: {fallback_code}")
-        return fallback_code
+        return f"Legacy-X25-OP{timestamp % 10000}"
 
 @app.route("/")
 def index():
-    return "Survey bot working"
+    return render_template("chat.html")
 
 @app.route("/submit", methods=["POST"])
 def submit():
@@ -66,6 +52,15 @@ def submit():
         
         # Generate Legacy Code
         legacy_code = generate_legacy_code()
+        
+        # Map the new survey questions to Airtable fields
+        # The new survey has these 6 questions mapped to original field names:
+        # 1. Future motivation → Q1 Reason for Business  
+        # 2. Time commitment → Q2 Time Commitment
+        # 3. Experience level → Q3 Business Experience
+        # 4. Readiness to start → Q4 Startup Readiness
+        # 5. Confidence level → Q5 Confidence Level
+        # 6. Team role preference → Q6 Business Style (GEM)
         
         # Ensure we have at least 6 answers
         while len(answers) < 6:
@@ -125,6 +120,47 @@ def submit():
             "status": "error"
         }), 500
 
+# Health check endpoint
+@app.route("/health")
+def health():
+    # Check if required environment variables are set
+    required_vars = [AIRTABLE_API_KEY, AIRTABLE_BASE_ID]
+    missing_vars = [var for var in required_vars if not var]
+    
+    if missing_vars:
+        return jsonify({
+            "status": "unhealthy", 
+            "message": "Missing required environment variables"
+        }), 500
+    
+    return jsonify({
+        "status": "healthy",
+        "base_id": AIRTABLE_BASE_ID,
+        "tables": {
+            "responses": RESPONSES_TABLE,
+            "hq": HQ_TABLE
+        }
+    })
+
+# Test endpoint to verify Airtable connection
+@app.route("/test-airtable")
+def test_airtable():
+    try:
+        url = f"https://api.airtable.com/v0/{BASE_ID}/{HQ_TABLE}?maxRecords=1"
+        headers = {"Authorization": f"Bearer {AIRTABLE_API_KEY}"}
+        response = requests.get(url, headers=headers)
+        
+        return jsonify({
+            "status": "success" if response.status_code == 200 else "error",
+            "status_code": response.status_code,
+            "response": response.json() if response.status_code == 200 else response.text
+        })
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "error": str(e)
+        })
+
 if __name__ == "__main__":
     # Check for required environment variables on startup
     if not AIRTABLE_API_KEY:
@@ -137,5 +173,4 @@ if __name__ == "__main__":
     print(f"Starting Flask app with Base ID: {AIRTABLE_BASE_ID}")
     print(f"Responses Table: {RESPONSES_TABLE}")
     print(f"HQ Table: {HQ_TABLE}")
-    
-    app.run(debug=True, host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
+    app.run(debug=True, host='0.0.0.0', port=5000)
