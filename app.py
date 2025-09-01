@@ -281,5 +281,5 @@ if __name__ == "__main__":
     print(f"Responses Table: {RESPONSES_TABLE}")
     print(f"HQ Table: {HQ_TABLE}")
     
-    # Simple Railway configuration - back to basics
-    app.run(debug=True, host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
+    # For Railway deployment with gunicorn
+    app.run(debug=False, host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
