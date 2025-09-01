@@ -52,7 +52,17 @@ def generate_legacy_code():
 
 @app.route("/")
 def index():
-    return render_template("chat.html")
+    try:
+        print("Attempting to render chat.html template")
+        return render_template("chat.html")
+    except Exception as e:
+        print(f"Error rendering template: {e}")
+        return f"Template Error: {e}", 500
+
+# Simple health check that doesn't use templates
+@app.route("/ping")
+def ping():
+    return "ANGUS Survey Bot is alive!", 200
 
 @app.route("/submit", methods=["POST"])
 def submit():
