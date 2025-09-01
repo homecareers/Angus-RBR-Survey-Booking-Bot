@@ -139,11 +139,6 @@ def submit():
             "status": "error"
         }), 500
 
-# Health check endpoint
-@app.route("/health")
-def health():
-    return "OK", 200
-
 # Test endpoint to verify Airtable connection
 @app.route("/test-airtable")
 def test_airtable():
