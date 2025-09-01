@@ -16,25 +16,39 @@ BASE_ID = AIRTABLE_BASE_ID
 HQ_TABLE = AIRTABLE_PROSPECTS_TABLE or "Legacy Code HQ"
 RESPONSES_TABLE = AIRTABLE_TABLE_NAME or "Legacy Builder Responses"
 
-# Function to generate Legacy Code
+# Function to generate Legacy Code with better sequence handling
 def generate_legacy_code():
-    url = f"https://api.airtable.com/v0/{BASE_ID}/{HQ_TABLE}?maxRecords=1&sort[0][field]=AutoNum&sort[0][direction]=desc"
-    headers = {"Authorization": f"Bearer {AIRTABLE_API_KEY}"}
-    
     try:
+        # Use timestamp-based approach for more reliability
+        timestamp = int(datetime.datetime.now().timestamp())
+        # Get last 4 digits and ensure it's above 1110
+        base_num = timestamp % 10000
+        if base_num < 1110:
+            base_num += 1110
+        
+        new_code = f"Legacy-X25-OP{base_num}"
+        
+        # Double-check this code doesn't already exist
+        url = f"https://api.airtable.com/v0/{BASE_ID}/{RESPONSES_TABLE}?filterByFormula={{Legacy Code}}='{new_code}'"
+        headers = {"Authorization": f"Bearer {AIRTABLE_API_KEY}"}
         response = requests.get(url, headers=headers).json()
+        
+        # If code exists, add a small random number
         if response.get("records"):
-            last_code = response["records"][0]["fields"].get("Legacy Code", "Legacy-X25-OP1110")
-            last_num = int(last_code.split("OP")[-1])
-        else:
-            last_num = 1110  # starting number
-        new_code = f"Legacy-X25-OP{last_num + 1}"
+            import random
+            base_num += random.randint(1, 99)
+            new_code = f"Legacy-X25-OP{base_num}"
+        
+        print(f"Generated Legacy Code: {new_code}")
         return new_code
+        
     except Exception as e:
         print(f"Error generating legacy code: {e}")
-        # Return a fallback code with timestamp
+        # Fallback with timestamp
         timestamp = int(datetime.datetime.now().timestamp())
-        return f"Legacy-X25-OP{timestamp % 10000}"
+        fallback_code = f"Legacy-X25-OP{timestamp % 10000 + 1110}"
+        print(f"Using fallback Legacy Code: {fallback_code}")
+        return fallback_code
 
 @app.route("/")
 def index():
