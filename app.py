@@ -52,38 +52,12 @@ def generate_legacy_code():
 
 @app.route("/")
 def index():
-    try:
-        print("Attempting to render chat.html template")
-        return render_template("chat.html")
-    except Exception as e:
-        print(f"Error rendering template: {e}")
-        return f"Template Error: {e}", 500
+    return render_template("chat.html")
 
-# Simple health check that doesn't use templates
-@app.route("/ping")
-def ping():
-    return "ANGUS Survey Bot is alive!", 200
-
-# Debug route to see what files exist
-@app.route("/debug")
-def debug():
-    import os
-    try:
-        current_dir = os.getcwd()
-        files = os.listdir(current_dir)
-        
-        debug_info = f"Current directory: {current_dir}\n"
-        debug_info += f"Files in root: {files}\n"
-        
-        if 'templates' in files:
-            template_files = os.listdir(os.path.join(current_dir, 'templates'))
-            debug_info += f"Files in templates: {template_files}\n"
-        else:
-            debug_info += "ERROR: templates folder not found!\n"
-            
-        return f"<pre>{debug_info}</pre>"
-    except Exception as e:
-        return f"Debug error: {e}"
+# Railway health check endpoint  
+@app.route("/health")
+def health():
+    return "OK", 200
 
 @app.route("/submit", methods=["POST"])
 def submit():
@@ -168,16 +142,11 @@ def submit():
 # Health check endpoint
 @app.route("/health")
 def health():
-    # Check if required environment variables are set
-    required_vars = [AIRTABLE_API_KEY, AIRTABLE_BASE_ID]
-    missing_vars = [var for var in required_vars if not var]
-    
-    if missing_vars:
-        return jsonify({
-            "status": "unhealthy", 
-            "message": "Missing required environment variables"
-        }), 500
-    
+    return "OK", 200
+
+# Test endpoint to verify Airtable connection
+@app.route("/test-airtable")
+def test_airtable():
     return jsonify({
         "status": "healthy",
         "base_id": AIRTABLE_BASE_ID,
@@ -186,25 +155,6 @@ def health():
             "hq": HQ_TABLE
         }
     })
-
-# Test endpoint to verify Airtable connection
-@app.route("/test-airtable")
-def test_airtable():
-    try:
-        url = f"https://api.airtable.com/v0/{BASE_ID}/{HQ_TABLE}?maxRecords=1"
-        headers = {"Authorization": f"Bearer {AIRTABLE_API_KEY}"}
-        response = requests.get(url, headers=headers)
-        
-        return jsonify({
-            "status": "success" if response.status_code == 200 else "error",
-            "status_code": response.status_code,
-            "response": response.json() if response.status_code == 200 else response.text
-        })
-    except Exception as e:
-        return jsonify({
-            "status": "error",
-            "error": str(e)
-        })
 
 if __name__ == "__main__":
     # Check for required environment variables on startup
@@ -219,6 +169,5 @@ if __name__ == "__main__":
     print(f"Responses Table: {RESPONSES_TABLE}")
     print(f"HQ Table: {HQ_TABLE}")
     
-    # Use Railway's PORT environment variable if available
-    port = int(os.environ.get("PORT", 5000))
-    app.run(debug=False, host='0.0.0.0', port=port)
+    # Simple Railway configuration - back to basics
+    app.run(debug=True, host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
