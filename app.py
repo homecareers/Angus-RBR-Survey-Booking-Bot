@@ -2,39 +2,58 @@ from flask import Flask, render_template, request, jsonify
 import requests
 import datetime
 import os
+import urllib.parse
 
 app = Flask(__name__)
 
 # Airtable credentials - properly get environment variables
 AIRTABLE_API_KEY = os.getenv('AIRTABLE_API_KEY')
 AIRTABLE_BASE_ID = os.getenv('AIRTABLE_BASE_ID') 
-AIRTABLE_TABLE_NAME = os.getenv('AIRTABLE_TABLE_NAME')
-AIRTABLE_PROSPECTS_TABLE = os.getenv('AIRTABLE_PROSPECTS_TABLE')
+AIRTABLE_RESPONSES_TABLE = os.getenv('AIRTABLE_TABLE_NAME') or "Survey Responses"
+AIRTABLE_PROSPECTS_TABLE = os.getenv('AIRTABLE_PROSPECTS_TABLE') or "Prospects"
 
-# Define table names (you may need to adjust these based on your Airtable setup)
 BASE_ID = AIRTABLE_BASE_ID
-HQ_TABLE = AIRTABLE_PROSPECTS_TABLE or "Legacy Code HQ"
-RESPONSES_TABLE = AIRTABLE_TABLE_NAME or "Legacy Builder Responses"
+HQ_TABLE = AIRTABLE_PROSPECTS_TABLE
+RESPONSES_TABLE = AIRTABLE_RESPONSES_TABLE
 
-# Function to generate Legacy Code
-def generate_legacy_code():
-    url = f"https://api.airtable.com/v0/{BASE_ID}/{HQ_TABLE}?maxRecords=1&sort[0][field]=AutoNum&sort[0][direction]=desc"
-    headers = {"Authorization": f"Bearer {AIRTABLE_API_KEY}"}
-    
-    try:
-        response = requests.get(url, headers=headers).json()
-        if response.get("records"):
-            last_code = response["records"][0]["fields"].get("Legacy Code", "Legacy-X25-OP1110")
-            last_num = int(last_code.split("OP")[-1])
-        else:
-            last_num = 1110  # starting number
-        new_code = f"Legacy-X25-OP{last_num + 1}"
-        return new_code
-    except Exception as e:
-        print(f"Error generating legacy code: {e}")
-        # Return a fallback code with timestamp
-        timestamp = int(datetime.datetime.now().timestamp())
-        return f"Legacy-X25-OP{timestamp % 10000}"
+def _h():
+    return {"Authorization": f"Bearer {AIRTABLE_API_KEY}", "Content-Type": "application/json"}
+
+def _url(table, record_id=None):
+    base = f"https://api.airtable.com/v0/{BASE_ID}/{urllib.parse.quote(table)}"
+    return f"{base}/{record_id}" if record_id else base
+
+def create_prospect_and_legacy_code(email, phone):
+    """
+    1) Create a Prospect row to reserve AutoNum
+    2) Read AutoNum -> compute Legacy Code (1000 + AutoNum)
+    3) Patch Prospect row with computed Legacy Code
+    4) Return (legacy_code, prospect_record_id)
+    """
+    payload = {"fields": {"Prospect Email": email, "Prospect Phone": phone}}
+    r = requests.post(_url(HQ_TABLE), headers=_h(), json=payload)
+    r.raise_for_status()
+    rec = r.json()
+    rec_id = rec["id"]
+    auto = rec.get("fields", {}).get("AutoNum")
+
+    # Fetch again if AutoNum not present yet
+    if auto is None:
+        r2 = requests.get(_url(HQ_TABLE, rec_id), headers=_h())
+        r2.raise_for_status()
+        auto = r2.json().get("fields", {}).get("AutoNum")
+
+    if auto is None:
+        raise RuntimeError("AutoNum not found. Ensure Prospects has an Auto Number field named 'AutoNum'.")
+
+    code_num = 1000 + int(auto)  # Example: AutoNum=58 -> Legacy-X25-OP1058
+    legacy_code = f"Legacy-X25-OP{code_num}"
+
+    # Patch the record with the Legacy Code
+    patch_payload = {"fields": {"Legacy Code": legacy_code}}
+    requests.patch(_url(HQ_TABLE, rec_id), headers=_h(), json=patch_payload)
+
+    return legacy_code, rec_id
 
 @app.route("/")
 def index():
@@ -47,129 +66,77 @@ def submit():
         email = data["email"]
         phone = data["phone"]
         answers = data["answers"]
-        
+
         print(f"Received survey data: Email={email}, Phone={phone}, Answers={len(answers)} responses")
-        
-        # Generate Legacy Code
-        legacy_code = generate_legacy_code()
-        
-        # Map the new survey questions to Airtable fields
-        # The new survey has these 6 questions mapped to original field names:
-        # 1. Future motivation → Q1 Reason for Business  
-        # 2. Time commitment → Q2 Time Commitment
-        # 3. Experience level → Q3 Business Experience
-        # 4. Readiness to start → Q4 Startup Readiness
-        # 5. Confidence level → Q5 Confidence Level
-        # 6. Team role preference → Q6 Business Style (GEM)
-        
-        # Ensure we have at least 6 answers
+
+        # Ensure 6 answers
         while len(answers) < 6:
             answers.append("No response provided")
-        
-        # Insert into Legacy Builder Responses
-        responses_url = f"https://api.airtable.com/v0/{BASE_ID}/{RESPONSES_TABLE}"
-        headers = {"Authorization": f"Bearer {AIRTABLE_API_KEY}", "Content-Type": "application/json"}
-        
-        payload_responses = {
+
+        # Create Prospect first (AutoNum → Legacy Code)
+        legacy_code, prospect_id = create_prospect_and_legacy_code(email, phone)
+
+        # Insert into Survey Responses (linked back to Prospect)
+        survey_payload = {
             "fields": {
+                "Date Submitted": datetime.datetime.now().isoformat(),
                 "Legacy Code": legacy_code,
-                "Date Submitted": datetime.date.today().isoformat(),
-                "Q1 Reason for Business": answers[0][:100000] if len(answers[0]) > 100000 else answers[0],
-                "Q2 Time Commitment": answers[1][:100000] if len(answers[1]) > 100000 else answers[1],
-                "Q3 Business Experience": answers[2][:100000] if len(answers[2]) > 100000 else answers[2],
-                "Q4 Startup Readiness": answers[3][:100000] if len(answers[3]) > 100000 else answers[3],
-                "Q5 Confidence Level": answers[4][:100000] if len(answers[4]) > 100000 else answers[4],
-                "Q6 Business Style (GEM)": answers[5][:100000] if len(answers[5]) > 100000 else answers[5]
+                "Q1 Reason for Business": answers[0],
+                "Q2 Time Commitment": answers[1],
+                "Q3 Business Experience": answers[2],
+                "Q4 Startup Readiness": answers[3],
+                "Q5 Confidence Level": answers[4],
+                "Q6 Business Style (GEM)": answers[5],
+                "Prospects": [prospect_id]   # Linked Record
             }
         }
-        
-        # Post to responses table
-        response1 = requests.post(responses_url, headers=headers, json=payload_responses)
-        if response1.status_code != 200:
-            print(f"Error posting to responses table: {response1.status_code} - {response1.text}")
+        responses_url = _url(RESPONSES_TABLE)
+        r3 = requests.post(responses_url, headers=_h(), json=survey_payload)
+        if r3.status_code != 200:
+            print(f"Error posting to responses table: {r3.status_code} - {r3.text}")
         else:
-            print("Successfully posted to responses table")
-        
-        # Insert into Legacy Code HQ (without Legacy Code field since it's computed)
-        hq_url = f"https://api.airtable.com/v0/{BASE_ID}/{HQ_TABLE}"
-        payload_hq = {
-            "fields": {
-                "Prospect Email": email,
-                "Prospect Phone": phone
-            }
-        }
-        
-        # Post to HQ table
-        response2 = requests.post(hq_url, headers=headers, json=payload_hq)
-        if response2.status_code != 200:
-            print(f"Error posting to HQ table: {response2.status_code} - {response2.text}")
-        else:
-            print("Successfully posted to HQ table")
-        
-        print(f"Survey completed successfully. Legacy Code: {legacy_code}")
-        return jsonify({
-            "legacy_code": legacy_code, 
-            "status": "success",
-            "message": "Survey submitted successfully!"
-        })
-    
+            print("Successfully posted to Survey Responses")
+
+        return jsonify({"status": "success", "message": "Survey submitted successfully!"})
+
     except Exception as e:
         print(f"Error in submit route: {e}")
-        return jsonify({
-            "error": "An error occurred processing your request",
-            "status": "error"
-        }), 500
+        return jsonify({"error": str(e), "status": "error"}), 500
 
-# Health check endpoint
 @app.route("/health")
 def health():
-    # Check if required environment variables are set
     required_vars = [AIRTABLE_API_KEY, AIRTABLE_BASE_ID]
     missing_vars = [var for var in required_vars if not var]
-    
     if missing_vars:
-        return jsonify({
-            "status": "unhealthy", 
-            "message": "Missing required environment variables"
-        }), 500
-    
+        return jsonify({"status": "unhealthy", "message": "Missing required environment variables"}), 500
+
     return jsonify({
         "status": "healthy",
         "base_id": AIRTABLE_BASE_ID,
-        "tables": {
-            "responses": RESPONSES_TABLE,
-            "hq": HQ_TABLE
-        }
+        "tables": {"responses": RESPONSES_TABLE, "hq": HQ_TABLE}
     })
 
-# Test endpoint to verify Airtable connection
 @app.route("/test-airtable")
 def test_airtable():
     try:
-        url = f"https://api.airtable.com/v0/{BASE_ID}/{HQ_TABLE}?maxRecords=1"
-        headers = {"Authorization": f"Bearer {AIRTABLE_API_KEY}"}
-        response = requests.get(url, headers=headers)
-        
+        url = _url(HQ_TABLE) + "?maxRecords=1"
+        r = requests.get(url, headers=_h())
         return jsonify({
-            "status": "success" if response.status_code == 200 else "error",
-            "status_code": response.status_code,
-            "response": response.json() if response.status_code == 200 else response.text
+            "status": "success" if r.status_code == 200 else "error",
+            "status_code": r.status_code,
+            "response": r.json() if r.status_code == 200 else r.text
         })
     except Exception as e:
-        return jsonify({
-            "status": "error",
-            "error": str(e)
-        })
+        return jsonify({"status": "error", "error": str(e)})
 
 if __name__ == "__main__":
-    # Check for required environment variables on startup
     if not AIRTABLE_API_KEY:
         print("ERROR: AIRTABLE_API_KEY environment variable is required")
         exit(1)
     if not AIRTABLE_BASE_ID:
         print("ERROR: AIRTABLE_BASE_ID environment variable is required")
         exit(1)
-        
+
     print(f"Starting Flask app with Base ID: {AIRTABLE_BASE_ID}")
     print(f"Responses Table: {RESPONSES_TABLE}")
     print(f"HQ Table: {HQ_TABLE}")
