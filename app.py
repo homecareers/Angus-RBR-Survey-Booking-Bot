@@ -97,14 +97,7 @@ def submit():
         else:
             print("Successfully posted to Survey Responses")
 
-        print(f"Survey completed successfully. Legacy Code: {legacy_code} (created in Airtable only)")
-        
-        # Return success with dummy legacy_code so frontend shows success message
-        return jsonify({
-            "legacy_code": "SUBMITTED", 
-            "status": "success", 
-            "message": "Survey submitted successfully!"
-        })
+        return jsonify({"legacy_code": "SUBMITTED", "status": "success", "message": "Survey submitted successfully!"})
 
     except Exception as e:
         print(f"Error in submit route: {e}")
@@ -147,4 +140,4 @@ if __name__ == "__main__":
     print(f"Starting Flask app with Base ID: {AIRTABLE_BASE_ID}")
     print(f"Responses Table: {RESPONSES_TABLE}")
     print(f"HQ Table: {HQ_TABLE}")
-    app.run(debug=True, host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
+    app.run(debug=True, host='0.0.0.0', port=5000)
